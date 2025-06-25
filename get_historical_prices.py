@@ -1,5 +1,3 @@
-### Get historical OHLCV stock prices using the Alpaca API.
-
 import pandas as pd
 from datetime import datetime, timezone, timedelta
 import pytz
@@ -10,38 +8,27 @@ from dotenv import load_dotenv
 import os
 
 # Load environment variables from .env file
-load_dotenv("/Users/jerzy/Develop/Python/.env")
+load_dotenv("/Users/chintzruparel/Documents/GitHub/startup/.env")
+
 # Data keys
 DATA_KEY = os.getenv("DATA_KEY")
 DATA_SECRET = os.getenv("DATA_SECRET")
 
+# Initialize Alpaca historical data client
 data_client = StockHistoricalDataClient(DATA_KEY, DATA_SECRET)
-
-
-### Get historical OHLCV bars of prices
 
 # Get current NY time
 ny_timezone = pytz.timezone("America/New_York")
-current_time = datetime.now(ny_timezone)
-# Print current date and time
-print("Date and time: ", current_time.strftime("%Y-%m-%d %H:%M:%S"))
+current_time_ny = datetime.now(ny_timezone)
+print("Date and time (NY):", current_time_ny.strftime("%Y-%m-%d %H:%M:%S"))
 
-# Run only between allowed hours (4 AM - 8 PM EST)
-# if current_time.hour < 4 or current_time.hour >= 20:
-#     print("Current time is outside of trading hours. Exiting script.")
-#     exit()
-                                    
-# Calculate UTC start time (10 minutes ago)
-# utc_now = datetime(2025, 6, 20, 15, 0, 0, tzinfo=timezone.utc)
+# Define UTC time range (last 10 minutes)
 utc_now = datetime.now(timezone.utc)
 start_time = utc_now - timedelta(minutes=10)
-#start_time = (datetime.utcnow() - timedelta(minutes=20)).isoformat()
 start = start_time.strftime("%Y-%m-%d %H:%M:%S")
-# print("Start time: ", start)
 end = utc_now.strftime("%Y-%m-%d %H:%M:%S")
-# print("End time:", end)
 
-# Define the trading symbol
+# Define symbol and request parameters
 symbol = "SPY"
 request_params = StockBarsRequest(
     symbol_or_symbols=[symbol],
@@ -49,15 +36,22 @@ request_params = StockBarsRequest(
     start=start,
     end=end,
     limit=100
-) # end StockBarsRequest
+)
 
+# Fetch historical bars
 bars = data_client.get_stock_bars(request_params)
-# print(f"Fetched {len(bars['SPY'])} bars for SPY from {start} to {end}")
-# print(bars)
+
+# Convert to DataFrame
 price_bars = pd.DataFrame([bar.model_dump() for bar in bars[symbol]])
 
-# Save data frame to CSV
+# Create output directory and filename
+output_dir = os.path.join(os.getcwd(), "Historical Files")
+os.makedirs(output_dir, exist_ok=True)
+
 current_time = datetime.now()
-file_name = "/Users/jerzy/Develop/MachineTrader/Internship_Summer_2025/data/price_bars_" + current_time.strftime("%Y%m%d") + ".csv"
-price_bars.to_csv(file_name, index=False)
-print("Finished getting historical OHLCV stock prices and saved to price_bars.csv")
+file_name = f"price_bars_{current_time.strftime('%Y%m%d')}.csv"
+file_path = os.path.join(output_dir, file_name)
+
+# Save to CSV
+price_bars.to_csv(file_path, index=False)
+print(f"Finished getting historical OHLCV stock prices and saved to: {file_path}")
