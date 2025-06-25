@@ -1,13 +1,12 @@
-# Download account information from Alpaca using the Alpaca Trade API.
-
 import pandas as pd
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 import alpaca_trade_api as tradeapi
 from dotenv import load_dotenv
 import os
 
 # Load environment variables from .env file
-load_dotenv("/Users/jerzy/Develop/Python/.env")
+load_dotenv("/Users/chintzruparel/Documents/GitHub/startup/.env")
+
 # Trade keys
 TRADE_KEY = os.getenv("TRADE_KEY")
 TRADE_SECRET = os.getenv("TRADE_SECRET")
@@ -27,13 +26,18 @@ print("Buying Power:", account.buying_power)
 print("Cash:", account.cash)
 print("Portfolio Value:", account.portfolio_value)
 
-# Convert account object to dictionary, then to DataFrame
+# Convert account to DataFrame
 account_frame = pd.DataFrame([account._raw])
-account_frame.shape
+print(f"Account DataFrame shape: {account_frame.shape}")
 
-# Save account info to CSV
+# Define output path
+output_dir = os.path.join(os.getcwd(), "Account Info Files")
+os.makedirs(output_dir, exist_ok=True)
+
 current_time = datetime.now()
-file_name = "/Users/jerzy/Develop/MachineTrader/Internship_Summer_2025/data/account_info_" + current_time.strftime("%Y%m%d") + ".csv"
-account_frame.to_csv(file_name, index=False)
+file_name = f"account_info_{current_time.strftime('%Y%m%d')}.csv"
+file_path = os.path.join(output_dir, file_name)
 
-
+# Save to CSV
+account_frame.to_csv(file_path, index=False)
+print(f"Finished saving account info to: {file_path}")
