@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 
 # Load environment variables from .env file
-load_dotenv("/Users/jerzy/Develop/Python/.env")
+load_dotenv("/Users/chintzruparel/Documents/GitHub/startup/.env")
 
 # Get API keys from environment
 # Data keys
