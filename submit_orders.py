@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import os
 
 # Load environment variables from .env file
-load_dotenv("/Users/jerzy/Develop/Python/.env")
+load_dotenv("/Users/chintzruparel/Documents/GitHub/startup/.env")
 # Data keys
 DATA_KEY = os.getenv("DATA_KEY")
 DATA_SECRET = os.getenv("DATA_SECRET")
