@@ -1,7 +1,5 @@
-# Retrieve trade orders using Alpaca API.
-
 import pandas as pd
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 import pytz
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import GetOrdersRequest
@@ -10,70 +8,35 @@ from dotenv import load_dotenv
 import os
 
 # Load environment variables from .env file
-load_dotenv("/Users/jerzy/Develop/Python/.env")
+load_dotenv("/Users/chintzruparel/Documents/GitHub/startup/.env")
+
 # Trade keys
 TRADE_KEY = os.getenv("TRADE_KEY")
 TRADE_SECRET = os.getenv("TRADE_SECRET")
 
+# Initialize client
 trading_client = TradingClient(TRADE_KEY, TRADE_SECRET)
 
-# Get all open orders
-orders = trading_client.get_orders(filter=GetOrdersRequest(status=QueryOrderStatus.OPEN))
-# Get all closed orders
+# Get closed orders (change to OPEN if needed)
 orders = trading_client.get_orders(filter=GetOrdersRequest(status=QueryOrderStatus.CLOSED))
-# print(orders)
-# Convert orders to data frame
-orders_frame = pd.DataFrame(orders)
-orders_frame.shape
-# print(orders_frame)
 
-# Get current NY time
+# Convert orders to DataFrame
+orders_frame = pd.DataFrame([order.__dict__ for order in orders])
+print(f"Orders DataFrame shape: {orders_frame.shape}")
+
+# Generate dynamic filename
 ny_timezone = pytz.timezone("America/New_York")
 current_time = datetime.now(ny_timezone)
-file_name = "/Users/jerzy/Develop/MachineTrader/Internship_Summer_2025/data/orders_" + current_time.strftime("%Y%m%d") + ".csv"
-orders_frame.to_csv(file_name, index=False)
-print("Finished getting orders and saved to orders.csv")
+file_name = f"orders_{current_time.strftime('%Y%m%d')}.csv"
 
-# Print the client IDs of the orders
+# Create output directory and save file
+output_dir = os.path.join(os.getcwd(), "Order Files")
+os.makedirs(output_dir, exist_ok=True)
+file_path = os.path.join(output_dir, file_name)
+orders_frame.to_csv(file_path, index=False)
+print(f"Finished getting orders and saved to: {file_path}")
+
+# Print order client IDs and order IDs
 for order in orders:
-    print("order_id: " + order.client_order_id)
-
-# Print the client IDs of the orders
-for order in orders:
-    print("order_id: " + order.id)
-
-
-##########
-# Alternative way to fetch orders using requests
-
-# import requests
-
-# headers = {
-#     "APCA-API-KEY-ID": TRADE_KEY,
-#     "APCA-API-SECRET-KEY": TRADE_SECRET
-# }
-
-# BASE_URL = "https://paper-api.alpaca.markets"  # Use "https://api.alpaca.markets" for live trading
-
-# # Fetch orders
-# response = requests.get(f"{BASE_URL}/v2/orders?status=all", headers=headers)
-# print(f"Fetching orders from {BASE_URL}/v2/orders")
-
-# if response.status_code == 200:
-#     orders = response.json()
-    
-#     # Convert to DataFrame
-#     orders_frame = pd.DataFrame(orders)
-
-#     # Display the first few rows
-#     # print(orders_frame)
-#     print(orders_frame.head())
-
-#     # Optionally save to CSV
-#     orders_frame.to_csv("/Users/jerzy/Develop/Python/alpaca_orders.csv", index=False)
-# else:
-#     print(f"Error: {response.status_code}, {response.text}")
-
-# # Save DataFrame to CSV
-# orders_frame.to_csv("/Users/jerzy/Develop/Python/paper3_orders.csv", index=False)
-
+    print(f"Client Order ID: {order.client_order_id}")
+    print(f"Order ID: {order.id}")
