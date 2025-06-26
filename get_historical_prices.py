@@ -35,7 +35,7 @@ request_params = StockBarsRequest(
     timeframe=TimeFrame.Minute,
     start=start,
     end=end,
-    limit=100,
+    limit=1000,
     feed="iex"
 )
 
