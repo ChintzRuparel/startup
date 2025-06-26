@@ -29,7 +29,7 @@ start = start_time.isoformat()
 end = utc_now.isoformat()
 
 # Define symbol and request parameters
-symbol = "AAPL"
+symbol = "SPY"
 request_params = StockBarsRequest(
     symbol_or_symbols=[symbol],
     timeframe=TimeFrame.Minute,
