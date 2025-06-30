@@ -42,7 +42,7 @@ trading_client = TradingClient(TRADE_KEY, TRADE_SECRET, paper=True)
 # ⚙️ Strategy settings
 # =============================================
 SYMBOL = "QQQ"
-POSITION_SIZE = 100
+POSITION_SIZE = 25
 TIMEFRAME = TimeFrame.Minute
 TIMEZONE = pytz.timezone("America/New_York")
 
