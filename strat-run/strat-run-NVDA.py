@@ -27,7 +27,7 @@ DATA_SECRET = os.getenv("DATA_SECRET")
 TRADE_KEY = os.getenv("TRADE_KEY")
 TRADE_SECRET = os.getenv("TRADE_SECRET")
 
-#GMAIL API KEYS
+# GMAIL API KEYS
 EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER")
@@ -67,32 +67,22 @@ def send_trade_email(subject, body):
 # =============================================
 # 🔁 LIVE loop
 # =============================================
-
-
-print("🚀 Starting LIVE HFT STRATEGY with trailing stops & email alerts!")
-
-
+print("🚀 Starting LIVE HFT STRATEGY for NVDA with trailing stops & email alerts!")
 
 while True:
-
-
     try:
-
-                # 🕒 Check if US market is open
-        ny_time = datetime.now(pytz.timezone("America/New_York"))
+        # 🕒 Check if US market is open
+        ny_time = datetime.now(TIMEZONE)
         market_open = ny_time.replace(hour=9, minute=30, second=0, microsecond=0)
         market_close = ny_time.replace(hour=16, minute=0, second=0, microsecond=0)
 
         if ny_time < market_open or ny_time > market_close:
-            print(f"⏰ Market is closed (NY time: {ny_time}). Waiting for next session...")
-            time.sleep(300)  # Sleep for 5 minutes before checking again
+            print(f"⏰ Market closed (NY time: {ny_time.strftime('%Y-%m-%d %H:%M:%S')}). Waiting for next session...")
+            time.sleep(300)
             continue
 
         # ============================
-        # 📈 Continue with your normal logic here!
-
-        
-        # 2hr rolling window
+        # 📈 Fetch market data
         utc_now = datetime.now(timezone.utc)
         start = utc_now - timedelta(minutes=120)
 
@@ -105,11 +95,16 @@ while True:
         )
 
         bars = data_client.get_stock_bars(request).data.get(SYMBOL)
+        if not bars or len(bars) == 0:
+            print(f"⚠️ No data returned for {SYMBOL}. Retrying in 60 seconds...")
+            time.sleep(60)
+            continue
+
         df = pd.DataFrame([bar.model_dump() for bar in bars])
         df['time'] = pd.to_datetime(df['timestamp'])
         df.set_index('time', inplace=True)
 
-        # Indicators
+        # 🧮 Indicators
         bb = BollingerBands(close=df['close'], window=10, window_dev=1.5)
         df['bb_upper'] = bb.bollinger_hband()
         df['bb_lower'] = bb.bollinger_lband()
@@ -129,6 +124,7 @@ while True:
 
         latest = df.iloc[-1]
 
+        # ✅ Signals
         buy_signal = (
             (latest['close'] > latest['vwap']) and
             (latest['macd'] > latest['macd_signal']) and
@@ -143,7 +139,7 @@ while True:
             (latest['atr'] > atr_median.iloc[-1])
         )
 
-        # ✅ BUY
+        # ✅ BUY order
         if buy_signal and not in_position:
             order = MarketOrderRequest(
                 symbol=SYMBOL,
@@ -156,59 +152,60 @@ while True:
             entry_price = latest['close']
             highest_price_since_entry = latest['close']
 
-            print(f"✅ BUY at {latest.name} - ${latest['close']:.2f}")
+            print(f"✅ BUY executed at {latest.name} - ${latest['close']:.2f}")
             send_trade_email(
                 f"✅ BUY Executed: {SYMBOL}",
                 f"BUY Order\nTime: {latest.name}\nPrice: ${latest['close']:.2f}\nQty: {POSITION_SIZE}"
             )
 
-        # Update highest
+        # ✅ Manage open position
         if in_position:
             highest_price_since_entry = max(highest_price_since_entry, latest['close'])
+            trailing_stop_trigger = highest_price_since_entry * 0.985
 
-        # 🚨 Trailing Stop: 1.5%
-        trailing_stop_trigger = highest_price_since_entry * 0.985
-        if in_position and latest['close'] <= trailing_stop_trigger:
-            order = MarketOrderRequest(
-                symbol=SYMBOL,
-                qty=POSITION_SIZE,
-                side=OrderSide.SELL,
-                time_in_force=TimeInForce.DAY
-            )
-            trading_client.submit_order(order)
-            in_position = False
-            entry_price = None
-            highest_price_since_entry = None
+            if latest['close'] <= trailing_stop_trigger:
+                order = MarketOrderRequest(
+                    symbol=SYMBOL,
+                    qty=POSITION_SIZE,
+                    side=OrderSide.SELL,
+                    time_in_force=TimeInForce.DAY
+                )
+                trading_client.submit_order(order)
+                in_position = False
+                entry_price = None
+                highest_price_since_entry = None
 
-            print(f"🚨 TRAILING STOP at {latest.name} - ${latest['close']:.2f}")
-            send_trade_email(
-                f"🚨 Trailing Stop SELL: {SYMBOL}",
-                f"Trailing Stop Triggered\nTime: {latest.name}\nPrice: ${latest['close']:.2f}\nTrigger: ${trailing_stop_trigger:.2f}\nQty: {POSITION_SIZE}"
-            )
+                print(f"🚨 TRAILING STOP triggered at {latest.name} - ${latest['close']:.2f}")
+                send_trade_email(
+                    f"🚨 Trailing Stop SELL: {SYMBOL}",
+                    f"Trailing Stop Triggered\nTime: {latest.name}\nPrice: ${latest['close']:.2f}\nTrigger: ${trailing_stop_trigger:.2f}\nQty: {POSITION_SIZE}"
+                )
 
-        # ❌ SELL signal
-        elif sell_signal and in_position:
-            order = MarketOrderRequest(
-                symbol=SYMBOL,
-                qty=POSITION_SIZE,
-                side=OrderSide.SELL,
-                time_in_force=TimeInForce.DAY
-            )
-            trading_client.submit_order(order)
-            in_position = False
-            entry_price = None
-            highest_price_since_entry = None
+            elif sell_signal:
+                order = MarketOrderRequest(
+                    symbol=SYMBOL,
+                    qty=POSITION_SIZE,
+                    side=OrderSide.SELL,
+                    time_in_force=TimeInForce.DAY
+                )
+                trading_client.submit_order(order)
+                in_position = False
+                entry_price = None
+                highest_price_since_entry = None
 
-            print(f"❌ SELL signal at {latest.name} - ${latest['close']:.2f}")
-            send_trade_email(
-                f"❌ SELL Executed: {SYMBOL}",
-                f"SELL Order\nTime: {latest.name}\nPrice: ${latest['close']:.2f}\nQty: {POSITION_SIZE}"
-            )
-        else:
+                print(f"❌ SELL signal executed at {latest.name} - ${latest['close']:.2f}")
+                send_trade_email(
+                    f"❌ SELL Executed: {SYMBOL}",
+                    f"SELL Order\nTime: {latest.name}\nPrice: ${latest['close']:.2f}\nQty: {POSITION_SIZE}"
+                )
+
+            else:
+                print(f"⏱️ Holding | Price: ${latest['close']:.2f} | Highest: ${highest_price_since_entry:.2f}")
+
+        elif not in_position:
             print(f"⏱️ No trade at {latest.name} | In Position: {in_position}")
 
     except Exception as e:
         print(f"⚠️ ERROR: {e}")
 
-    # Wait for next bar
     time.sleep(60)
