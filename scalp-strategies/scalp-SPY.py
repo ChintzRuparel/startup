@@ -89,7 +89,8 @@ while True:
             symbol_or_symbols=[SYMBOL],
             timeframe=TIMEFRAME,
             start=start.isoformat(),
-            end=utc_now.isoformat()
+            end=utc_now.isoformat(),
+            feed="iex"
         )
 
         bars = stock_client.get_stock_bars(request).data.get(SYMBOL)
