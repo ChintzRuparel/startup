@@ -4,15 +4,18 @@ from datetime import datetime, timezone, timedelta
 import pytz
 import pandas as pd
 from dotenv import load_dotenv
+
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
+
 from ta.trend import MACD
 from ta.volatility import BollingerBands, AverageTrueRange
 from ta.volume import VolumeWeightedAveragePrice
+
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -21,12 +24,12 @@ from email.mime.multipart import MIMEMultipart
 # 🔐 Load credentials
 # =============================================
 load_dotenv("/Users/chintzruparel/Documents/GitHub/startup/.env")
-#Alpaca API Creds
+
 DATA_KEY = os.getenv("DATA_KEY")
 DATA_SECRET = os.getenv("DATA_SECRET")
 TRADE_KEY = os.getenv("TRADE_KEY")
 TRADE_SECRET = os.getenv("TRADE_SECRET")
-# GMAIL API Creds
+
 EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER")
@@ -50,6 +53,13 @@ highest_price_since_entry = None
 entry_price = None
 
 # =============================================
+# 📑 AUDIT LOG SETUP
+# =============================================
+audit_log = []
+start_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+audit_filename = f"strat_{SYMBOL}_{start_timestamp}.csv"
+
+# =============================================
 # 📧 Email helper
 # =============================================
 def send_trade_email(subject, body):
@@ -66,18 +76,22 @@ def send_trade_email(subject, body):
 # =============================================
 # 🔁 LIVE HFT Loop
 # =============================================
-print("🚀 Starting LIVE HFT Scalping Strategy with Trailing Stops & Condition Logging")
+print("🚀 Starting DAILY HFT Scalping Strategy with final AUDIT log save")
 
-while True:
-    try:
+try:
+    while True:
         ny_time = datetime.now(TIMEZONE)
         market_open = ny_time.replace(hour=9, minute=30, second=0, microsecond=0)
-        market_close = ny_time.replace(hour=16, minute=0, microsecond=0)
+        market_close = ny_time.replace(hour=16, minute=0, second=0, microsecond=0)
 
-        if ny_time < market_open or ny_time > market_close:
-            print(f"⏰ Market closed (NY time: {ny_time.strftime('%Y-%m-%d %H:%M:%S')}). Waiting...")
+        if ny_time < market_open:
+            print(f"⏰ Market not open yet (NY time: {ny_time.strftime('%Y-%m-%d %H:%M:%S')}). Waiting...")
             time.sleep(300)
             continue
+
+        if ny_time >= market_close:
+            print("✅ Market closed. Exiting loop.")
+            break
 
         # 📈 Fetch market data
         utc_now = datetime.now(timezone.utc)
@@ -150,6 +164,32 @@ while True:
         print(f"   4) ATR > ATR Median: {sell_condition_4} ({latest['atr']:.4f} > {atr_median.iloc[-1]:.4f})")
         print(f"  => SELL Signal: {sell_signal}\n")
 
+        # 📑 Append audit log row
+        audit_log.append({
+            "timestamp": latest.name,
+            "close": latest['close'],
+            "vwap": latest['vwap'],
+            "macd": latest['macd'],
+            "macd_signal": latest['macd_signal'],
+            "bb_upper": latest['bb_upper'],
+            "bb_lower": latest['bb_lower'],
+            "atr": latest['atr'],
+            "atr_median": atr_median.iloc[-1],
+            "buy_condition_1": buy_condition_1,
+            "buy_condition_2": buy_condition_2,
+            "buy_condition_3": buy_condition_3,
+            "buy_condition_4": buy_condition_4,
+            "buy_signal": buy_signal,
+            "sell_condition_1": sell_condition_1,
+            "sell_condition_2": sell_condition_2,
+            "sell_condition_3": sell_condition_3,
+            "sell_condition_4": sell_condition_4,
+            "sell_signal": sell_signal,
+            "in_position": in_position,
+            "entry_price": entry_price if entry_price else "",
+            "highest_price_since_entry": highest_price_since_entry if highest_price_since_entry else ""
+        })
+
         # ✅ BUY order
         if buy_signal and not in_position:
             order = MarketOrderRequest(
@@ -163,20 +203,11 @@ while True:
             entry_price = latest['close']
             highest_price_since_entry = latest['close']
 
-            print(
-                f"✅ BUY executed at {latest.name} - ${latest['close']:.2f}\n"
-                f"   VWAP: {latest['vwap']:.2f}, MACD: {latest['macd']:.4f}, MACD_Signal: {latest['macd_signal']:.4f}\n"
-                f"   BB Lower: {latest['bb_lower']:.2f}, ATR: {latest['atr']:.4f}, ATR Median: {atr_median.iloc[-1]:.4f}"
-            )
+            print(f"✅ BUY executed at {latest.name} - ${latest['close']:.2f}")
 
             send_trade_email(
                 f"✅ BUY Executed: {SYMBOL}",
-                f"BUY Order\nTime: {latest.name}\nPrice: ${latest['close']:.2f}\nQty: {POSITION_SIZE}\n\n"
-                f"BUY Conditions:\n"
-                f"Close > VWAP: {buy_condition_1}\nMACD > MACD_Signal: {buy_condition_2}\n"
-                f"Close < BB Lower: {buy_condition_3}\nATR > ATR Median: {buy_condition_4}\n"
-                f"VWAP: {latest['vwap']:.2f}\nMACD: {latest['macd']:.4f} | MACD_Signal: {latest['macd_signal']:.4f}\n"
-                f"BB Lower: {latest['bb_lower']:.2f}\nATR: {latest['atr']:.4f} | ATR Median: {atr_median.iloc[-1]:.4f}"
+                f"BUY Order\nTime: {latest.name}\nPrice: ${latest['close']:.2f}\nQty: {POSITION_SIZE}"
             )
 
         # ✅ Manage open position
@@ -196,15 +227,11 @@ while True:
                 entry_price = None
                 highest_price_since_entry = None
 
-                print(
-                    f"🚨 TRAILING STOP triggered at {latest.name} - ${latest['close']:.2f}\n"
-                    f"   Highest Price: ${highest_price_since_entry:.2f}\n"
-                    f"   Trigger: ${trailing_stop_trigger:.2f}\n"
-                )
+                print(f"🚨 TRAILING STOP triggered at {latest.name} - ${latest['close']:.2f}")
 
                 send_trade_email(
                     f"🚨 Trailing Stop SELL: {SYMBOL}",
-                    f"Trailing Stop Triggered\nTime: {latest.name}\nPrice: ${latest['close']:.2f}\nTrigger: ${trailing_stop_trigger:.2f}\nQty: {POSITION_SIZE}"
+                    f"Trailing Stop Triggered\nTime: {latest.name}\nPrice: ${latest['close']:.2f}\nQty: {POSITION_SIZE}"
                 )
 
             elif sell_signal:
@@ -219,29 +246,25 @@ while True:
                 entry_price = None
                 highest_price_since_entry = None
 
-                print(
-                    f"❌ SELL signal executed at {latest.name} - ${latest['close']:.2f}\n"
-                )
+                print(f"❌ SELL signal executed at {latest.name} - ${latest['close']:.2f}")
 
                 send_trade_email(
                     f"❌ SELL Executed: {SYMBOL}",
-                    f"SELL Order\nTime: {latest.name}\nPrice: ${latest['close']:.2f}\nQty: {POSITION_SIZE}\n\n"
-                    f"SELL Conditions:\n"
-                    f"Close < VWAP: {sell_condition_1}\nMACD < MACD_Signal: {sell_condition_2}\n"
-                    f"Close > BB Upper: {sell_condition_3}\nATR > ATR Median: {sell_condition_4}\n"
+                    f"SELL Order\nTime: {latest.name}\nPrice: ${latest['close']:.2f}\nQty: {POSITION_SIZE}"
                 )
 
             else:
-                print(
-                    f"⏱️ Holding | Price: ${latest['close']:.2f} | Highest: ${highest_price_since_entry:.2f} | Trailing Stop: ${trailing_stop_trigger:.2f}\n"
-                )
+                print(f"⏱️ Holding | Price: ${latest['close']:.2f} | Highest: ${highest_price_since_entry:.2f} | Trailing Stop: ${trailing_stop_trigger:.2f}\n")
 
         elif not in_position:
-            print(
-                f"⏱️ No trade at {latest.name} | In Position: {in_position}"
-            )
+            print(f"⏱️ No trade at {latest.name} | In Position: {in_position}")
 
-    except Exception as e:
-        print(f"⚠️ ERROR: {e}")
+        time.sleep(60)
 
-    time.sleep(60)
+except Exception as e:
+    print(f"⚠️ ERROR: {e}")
+
+finally:
+    audit_df = pd.DataFrame(audit_log)
+    audit_df.to_csv(audit_filename, index=False)
+    print(f"📑 Final audit log saved to {audit_filename}")

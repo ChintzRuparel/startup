@@ -41,7 +41,7 @@ trading_client = TradingClient(TRADE_KEY, TRADE_SECRET, paper=True)
 # ⚙️ Strategy Settings
 # =============================================
 SYMBOL = "SPY"
-POSITION_SIZE = 1  # Example: 1 share
+POSITION_SIZE = 100  # Example: 1 share
 TIMEFRAME = TimeFrame.Minute  # Only minute-level for stocks
 
 in_position = False
