@@ -21,11 +21,12 @@ from email.mime.multipart import MIMEMultipart
 # 🔐 Load credentials
 # =============================================
 load_dotenv("/Users/chintzruparel/Documents/GitHub/startup/.env")
-
+#Alpaca API creds
 DATA_KEY = os.getenv("DATA_KEY")
 DATA_SECRET = os.getenv("DATA_SECRET")
 TRADE_KEY = os.getenv("TRADE_KEY")
 TRADE_SECRET = os.getenv("TRADE_SECRET")
+# GMAIL API Creds
 EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER")
