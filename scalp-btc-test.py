@@ -32,7 +32,7 @@ trading_client = TradingClient(TRADE_KEY, TRADE_SECRET, paper=True)
 # ⚙️ Strategy Settings
 # =============================================
 SYMBOL = "BTC/USD"
-POSITION_SIZE = 0.001
+POSITION_SIZE = 0.1
 TIMEFRAME = TimeFrame.Minute  # use 1-min bars for crypto
 
 in_position = False
