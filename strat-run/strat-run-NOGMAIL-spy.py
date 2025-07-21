@@ -16,9 +16,9 @@ from ta.trend import MACD
 from ta.volatility import BollingerBands, AverageTrueRange
 from ta.volume import VolumeWeightedAveragePrice
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+# import smtplib
+# from email.mime.text import MIMEText
+# from email.mime.multipart import MIMEMultipart
 
 # =============================================
 # 🔐 Load credentials
